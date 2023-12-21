@@ -107,9 +107,14 @@ from datetime import datetime
 class BaseResponse:
     ts: datetime = datetime.utcnow()
 
+from typing import Generic, TypeVar
+T = TypeVar("T")
+
+
+
 @define
-class GetAllQuotesResponse(BaseResponse):
-    quotes: list[QuotesTable] = field(kw_only=True)
+class GetAllQuotesResponse(Generic[T]):
+    quotes: list[T]
 
 class QuotesAPI(Controller):
     path = '/quote'
@@ -119,7 +124,7 @@ class QuotesAPI(Controller):
     async def get_all_quotes(self, sqlite_session: AsyncSession) -> list[QuotesTable]:
         return await get_all_quotes(sqlite_session)
     
-    @get('/all-not-working')
+    @get('/all-not-working', return_dto=QuotesDTO)
     async def get_all_quotes_not_working(self, sqlite_session: AsyncSession) -> GetAllQuotesResponse:
         res = GetAllQuotesResponse(quotes=await get_all_quotes(sqlite_session))
         LOGGER.critical(f"sherlock {res}")
