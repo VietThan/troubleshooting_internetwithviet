@@ -56,7 +56,7 @@ class QuotesTable(Base):
 
 	__table_args__= (UniqueConstraint("quote"),)
 
-QuotesDTO = SQLAlchemyDTO[QuotesTable]
+QuotesSQLAlchemyDTO = SQLAlchemyDTO[QuotesTable]
 
 @asynccontextmanager
 async def sqlite_connection(app: Litestar) -> AsyncGenerator[None, None]:
@@ -102,10 +102,32 @@ async def get_all_quotes(sqlite_session: AsyncSession) -> list[QuotesTable]:
 
 from datetime import datetime
 
+from typing import Self
+from copy import copy
+
 
 @define
 class BaseResponse:
     ts: datetime = datetime.utcnow()
+
+@define
+class BaseDTO:
+    @classmethod
+    def from_table(cls, qt: Base) -> Self:
+        d = copy(qt.__dict__)
+        del d["_sa_instance_state"]
+        return cls(**d)
+
+@define
+class QuotesDTO(BaseDTO):
+	id: int
+	quote: str
+	created_tstamp: datetime
+	modified_tstamp: datetime
+
+@define
+class GetAllQuotesWebResponse(BaseResponse):
+	quotes: list[QuotesDTO] = field(kw_only=True)
 
 from typing import Generic, TypeVar
 T = TypeVar("T")
@@ -113,8 +135,8 @@ T = TypeVar("T")
 
 
 @define
-class GetAllQuotesResponse(Generic[T]):
-    quotes: list[T]
+class GetAllQuotesResponse(BaseResponse, Generic[T]):
+    quotes: list[T] = field(kw_only=True)
 
 class QuotesAPI(Controller):
     path = '/quote'
@@ -124,9 +146,15 @@ class QuotesAPI(Controller):
     async def get_all_quotes(self, sqlite_session: AsyncSession) -> list[QuotesTable]:
         return await get_all_quotes(sqlite_session)
     
-    @get('/all-not-working', return_dto=QuotesDTO)
-    async def get_all_quotes_not_working(self, sqlite_session: AsyncSession) -> GetAllQuotesResponse:
+    @get('/all-not-working', return_dto=QuotesSQLAlchemyDTO)
+    async def get_all_quotes_not_working(self, sqlite_session: AsyncSession) -> GetAllQuotesResponse[QuotesTable]:
         res = GetAllQuotesResponse(quotes=await get_all_quotes(sqlite_session))
+        LOGGER.critical(f"sherlock {res}")
+        return res
+    
+    @get('/all-not-working2', return_dto=QuotesSQLAlchemyDTO)
+    async def get_all_quotes_not_workin2(self, sqlite_session: AsyncSession) -> GetAllQuotesWebResponse:
+        res = GetAllQuotesWebResponse(quotes=await get_all_quotes(sqlite_session))
         LOGGER.critical(f"sherlock {res}")
         return res
 
